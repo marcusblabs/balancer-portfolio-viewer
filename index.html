@@ -496,9 +496,8 @@
     </form>
     <div class="examples">
       <span class="label">Try:</span>
-      <button data-addr="0x849D52316331967b6fF1198e5E32A0eB168D039d">Karpatkey treasury</button>
-      <button data-addr="0xc38c5f97B89E94f9C16f4e98ABaC65b9b8c8c80c">Balancer DAO multisig</button>
-      <button data-addr="0xA86b34b41ee59E093db1d05bDF20EaaA63D0A4Fe">Aura Finance</button>
+      <button data-addr="0x5c398a8ef965f2fB6559B4302De440Fe75574bD5">Miracle</button>
+      <button data-addr="0xA9924AcB7264baBB31AE07B167b554777E41aaf6">Daily deploy</button>
     </div>
   </div>
 
@@ -546,8 +545,8 @@
     <select id="filter-min-balance">
       <option value="0">Any balance</option>
       <option value="1">≥ $1</option>
-      <option value="10">≥ $10</option>
-      <option value="100" selected>≥ $100</option>
+      <option value="10" selected>≥ $10</option>
+      <option value="100">≥ $100</option>
       <option value="1000">≥ $1,000</option>
       <option value="10000">≥ $10,000</option>
     </select>
@@ -585,10 +584,10 @@
           <th data-sort="chain">Chain <span class="arrow">▲</span></th>
           <th data-sort="type">Type <span class="arrow">▲</span></th>
           <th data-sort="version">Ver <span class="arrow">▲</span></th>
-          <th data-sort="tvl" class="numeric">Pool TVL <span class="arrow">▲</span></th>
+          <th data-sort="balance" class="numeric sorted">My Balance <span class="arrow">▼</span></th>
           <th data-sort="volume" class="numeric">Vol 24h <span class="arrow">▲</span></th>
           <th data-sort="yieldApr" class="numeric">Yield APR <span class="arrow">▲</span></th>
-          <th data-sort="balance" class="numeric sorted">My Balance <span class="arrow">▼</span></th>
+          <th data-sort="tvl" class="numeric">Pool TVL <span class="arrow">▲</span></th>
         </tr>
       </thead>
       <tbody id="pool-tbody"></tbody>
@@ -900,9 +899,6 @@ function render() {
       <td><span class="chip chain" style="color:${chainColor}; background: ${chainColor}1a">${chainShort}</span></td>
       <td><span class="chip type">${esc(p.type.replace(/_/g, ' '))}</span></td>
       <td><span class="chip ver">v${p.protocolVersion}</span></td>
-      <td class="numeric">${fmt$(p.tvl)}</td>
-      <td class="numeric">${fmt$(p.vol)}</td>
-      <td class="numeric"><span class="${p.yieldApr > 0 ? 'apr-pos' : 'muted'}">${fmtApr(p.yieldApr)}</span></td>
       <td class="numeric">
         <div class="balance-cell">
           <span class="primary-val">${fmt$Exact(p.balance)}</span>
@@ -914,6 +910,9 @@ function render() {
           </div>
         </div>
       </td>
+      <td class="numeric">${fmt$(p.vol)}</td>
+      <td class="numeric"><span class="${p.yieldApr > 0 ? 'apr-pos' : 'muted'}">${fmtApr(p.yieldApr)}</span></td>
+      <td class="numeric">${fmt$(p.tvl)}</td>
     </tr>`;
   }).join('');
 
