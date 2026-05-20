@@ -587,7 +587,8 @@
           <th data-sort="version">Ver <span class="arrow">▲</span></th>
           <th data-sort="balance" class="numeric sorted">My Balance <span class="arrow">▼</span></th>
           <th data-sort="volume" class="numeric">Vol 24h <span class="arrow">▲</span></th>
-          <th data-sort="yieldApr" class="numeric">Yield APR <span class="arrow">▲</span></th>
+          <th data-sort="swapFeeApr" class="numeric" title="Swap-fee APR over the last 24h (includes dynamic / surge swap fees)">Swap Fee APR <span class="arrow">▲</span></th>
+          <th data-sort="yieldApr" class="numeric" title="APR from token yield (rate-provider / IB_YIELD items)">Yield APR <span class="arrow">▲</span></th>
           <th data-sort="tvl" class="numeric">Pool TVL <span class="arrow">▲</span></th>
         </tr>
       </thead>
@@ -771,6 +772,10 @@ function processPool(p) {
   const yieldApr = aprItems
     .filter(i => i.type && /YIELD/i.test(i.type))
     .reduce((s, i) => s + (parseFloat(i.apr) || 0), 0);
+  // Catches both SWAP_FEE_24H (regular pools) and DYNAMIC_SWAP_FEE_24H (surge / dynamic-fee hooks)
+  const swapFeeApr = aprItems
+    .filter(i => i.type && /SWAP_FEE/i.test(i.type))
+    .reduce((s, i) => s + (parseFloat(i.apr) || 0), 0);
   const totalApr = aprItems.reduce((s, i) => s + (parseFloat(i.apr) || 0), 0);
 
   const ub = p.userBalance || {};
@@ -785,7 +790,7 @@ function processPool(p) {
   return {
     ...p,
     tvl, vol,
-    yieldApr, totalApr,
+    yieldApr, swapFeeApr, totalApr,
     balance, walletBal, stakedBal,
     stakedBalances,
     dailyYield,
@@ -845,6 +850,7 @@ function applySorting() {
     version: p => p.protocolVersion,
     tvl: p => p.tvl,
     volume: p => p.vol,
+    swapFeeApr: p => p.swapFeeApr,
     yieldApr: p => p.yieldApr,
     balance: p => p.balance,
   };
@@ -918,6 +924,7 @@ function render() {
         </div>
       </td>
       <td class="numeric">${fmt$(p.vol)}</td>
+      <td class="numeric"><span class="${p.swapFeeApr > 0 ? 'apr-pos' : 'muted'}">${fmtApr(p.swapFeeApr)}</span></td>
       <td class="numeric"><span class="${p.yieldApr > 0 ? 'apr-pos' : 'muted'}">${fmtApr(p.yieldApr)}</span></td>
       <td class="numeric">${fmt$(p.tvl)}</td>
     </tr>`;
@@ -1032,7 +1039,7 @@ document.querySelectorAll('thead th[data-sort]').forEach(th => {
       sortDir = sortDir === 'asc' ? 'desc' : 'asc';
     } else {
       sortKey = key;
-      sortDir = ['tvl', 'volume', 'yieldApr', 'balance', 'version'].includes(key) ? 'desc' : 'asc';
+      sortDir = ['tvl', 'volume', 'swapFeeApr', 'yieldApr', 'balance', 'version'].includes(key) ? 'desc' : 'asc';
     }
     document.querySelectorAll('thead th').forEach(h => {
       h.classList.remove('sorted');
@@ -1123,7 +1130,7 @@ function exportCsv() {
   const headers = [
     'Pool Name', 'Tokens', 'Type', 'Chain', 'Version', 'Pool Address',
     'Pool TVL (USD)', 'Pool Vol 24h (USD)',
-    'Yield APR (%)', 'Total APR (%)',
+    'Swap Fee APR (%)', 'Yield APR (%)', 'Total APR (%)',
     'My Balance (USD)', 'Wallet (USD)', 'Staked (USD)',
     'Staking Detail',
     'Daily Yield Est. (USD)',
@@ -1138,6 +1145,7 @@ function exportCsv() {
     p.address,
     p.tvl.toFixed(2),
     p.vol.toFixed(2),
+    (p.swapFeeApr * 100).toFixed(4),
     (p.yieldApr * 100).toFixed(4),
     (p.totalApr * 100).toFixed(4),
     p.balance.toFixed(2),
