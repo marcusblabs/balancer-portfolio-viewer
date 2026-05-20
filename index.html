@@ -818,7 +818,7 @@ function populateFilters() {
   });
 }
 
-function applyFilters() {
+function applyFilters({ resetPage = true } = {}) {
   const search = document.getElementById('search').value.toLowerCase().trim();
   const chain = document.getElementById('filter-chain').value;
   const type = document.getElementById('filter-type').value;
@@ -833,7 +833,7 @@ function applyFilters() {
     if (p.balance < minBal) return false;
     return true;
   });
-  currentPage = 0;
+  if (resetPage) currentPage = 0;
   render();
 }
 
@@ -874,6 +874,12 @@ function render() {
   } else {
     table.style.display = 'table';
   }
+
+  // Clamp currentPage if the filtered set shrunk (e.g., a position closed
+  // between refreshes) so we don't end up on an empty page.
+  const _totalPages = Math.max(1, Math.ceil(filteredPools.length / PAGE_SIZE));
+  if (currentPage >= _totalPages) currentPage = _totalPages - 1;
+  if (currentPage < 0) currentPage = 0;
 
   const start = currentPage * PAGE_SIZE;
   const page = filteredPools.slice(start, start + PAGE_SIZE);
@@ -1185,9 +1191,19 @@ async function refresh() {
     }
 
     // Re-populate filter dropdowns in case the set of chains/types changed
+    // between refreshes — but preserve the user's current selections so a
+    // refresh feels like "just update the numbers", not "reset my view".
+    const chainSel = document.getElementById('filter-chain');
+    const typeSel = document.getElementById('filter-type');
+    const prevChain = chainSel.value;
+    const prevType = typeSel.value;
     populateFilters();
+    if ([...chainSel.options].some(o => o.value === prevChain)) chainSel.value = prevChain;
+    if ([...typeSel.options].some(o => o.value === prevType)) typeSel.value = prevType;
+
     applySorting();
-    applyFilters();
+    applyFilters({ resetPage: false });   // keep user on the same page
+
     const now = new Date();
     document.getElementById('stat-time').textContent =
       now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
