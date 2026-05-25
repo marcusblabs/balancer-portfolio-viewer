@@ -1,310 +1,288 @@
-# Onboarding Balancer v3 LP Tokens (BPTs) as Collateral on Aave v4
+# Balancer v3 LP Tokens as Aave v4 Collateral
 
-### A deep analysis and a TEMP CHECK–ready proposal for a dedicated, collateral‑only Balancer Spoke
+### A deep analysis and a staged, evidence-gated strategy (with a TEMP CHECK–ready proposal for when the gates are met)
 
 **Author:** Balancer (marcus@balancerlabs.dev)
 **Date:** May 2026
-**Status:** Draft for internal review → TEMP CHECK
+**Status:** Internal strategy + draft proposal — **not yet ready for a public TEMP CHECK** (see gating conditions, §10)
 **Target venue:** Aave v4, Ethereum mainnet
 
 ---
 
-> **How to read this document.** Sections 1–7 are written to become a public Aave governance post (TEMP CHECK, then ARFC). Sections 8–10 and the appendices are **INTERNAL** Balancer strategy — they contain candid governance politics, a self‑critique log, and verification to‑dos that should be trimmed before anything is posted to `governance.aave.com`. Every load‑bearing number is tagged with a source and, where it could not be fetched live in this environment, a **[VERIFY]** flag.
+> **How to read this document.** Sections 1–8 are written so they can become a public Aave governance post (TEMP CHECK → ARFC) **once the §10 gates are met.** Sections 9–10 and the appendices are **INTERNAL** Balancer strategy — candid governance politics, a self‑critique log, cost model, and verification to‑dos that must be trimmed before posting. Every load‑bearing number is tagged with a source and, where it could not be fetched live in this environment, a **[VERIFY]** flag.
+>
+> **This draft has been hardened through five devil's‑advocate cycles (logged in §12).** The headline conclusion changed materially as a result: on today's numbers and today's Aave politics, a direct listing fails cost/benefit and lacks a sponsor. The recommended path is therefore **prove the model permissionlessly first, then approach Aave with evidence** — not "ask Aave to approve this now."
 
 ---
 
-## 0. Honest preface — why this is a hard sell in May 2026, and why it is still worth doing
+## 0. Honest preface — three objections we open with, because every reader will
 
-Any serious reader on the Aave side will open with three objections, so we open with them too:
+1. **Balancer was exploited for ~$128M on 3 November 2025**, via a rounding/precision bug in the **v2 Composable Stable Pool** invariant. **Balancer v3 pools were not affected.** ([Check Point](https://research.checkpoint.com/2025/how-an-attacker-drained-128m-from-balancer-through-rounding-error-exploitation/), [OpenZeppelin](https://www.openzeppelin.com/news/understanding-the-balancer-v2-exploit)) — *but "v3 was untouched" is not "v3 is proven"; see §5.5 and §7.4.*
+2. **Balancer Labs announced a corporate wind‑down in March 2026**; BAL emissions ended, veBAL was dismantled, scope cut to a handful of core pool types, with the protocol continuing under a leaner DAO/"OpCo" funded by treasury fees on a ~$117M protocol. ([CoinDesk](https://www.coindesk.com/tech/2026/03/24/balancer-labs-will-shut-down-as-corporate-entity-became-a-liability-after-usd110-million-exploit), [The Defiant](https://thedefiant.io/news/defi/balancer-proposes-labs-shutdown-bal-tokenomics-shift)) **Who funds v3 security now is the first question any Aave delegate asks, and it is currently unanswered (§10, gate G4).**
+3. **Aave already tried LP‑token collateral and walked away** — the v2 "AMM Market" (2021) accepted Uniswap/Balancer LP tokens, saw low usage, and was deprecated. ([Aave AMM Market](https://medium.com/aave/aave-amm-market-released-73ae76a7cbc0), [deprecation ARFC](https://governance.aave.com/t/arfc-deprecate-aave-v2-amm-market/12830))
 
-1. **Balancer was exploited for ~$128M on 3 November 2025.** The bug was a rounding/precision inconsistency in the **v2 Composable Stable Pool** invariant. **Balancer v3 pools were not affected.** ([Check Point](https://research.checkpoint.com/2025/how-an-attacker-drained-128m-from-balancer-through-rounding-error-exploitation/), [OpenZeppelin](https://www.openzeppelin.com/news/understanding-the-balancer-v2-exploit), [Certora](https://www.certora.com/blog/breaking-down-the-balancer-hack))
-2. **Balancer Labs (the corporate entity) announced a wind‑down in March 2026**, BAL emissions ended and veBAL was dismantled; the protocol continues under a leaner DAO/"OpCo." ([CoinDesk, 2026‑03‑24](https://www.coindesk.com/tech/2026/03/24/balancer-labs-will-shut-down-as-corporate-entity-became-a-liability-after-usd110-million-exploit), [The Defiant](https://thedefiant.io/news/defi/balancer-proposes-labs-shutdown-bal-tokenomics-shift))
-3. **Aave has tried LP‑token collateral before and walked away.** The Aave v2 "AMM Market" (2021) accepted Uniswap‑ and Balancer‑pool LP tokens, saw low usage, and was deprecated (LTs set to 0, assets frozen). ([Aave AMM Market](https://medium.com/aave/aave-amm-market-released-73ae76a7cbc0), [deprecation ARFC](https://governance.aave.com/t/arfc-deprecate-aave-v2-amm-market/12830))
-
-This proposal does **not** ask Aave to re‑accept the thing that broke. It asks Aave to accept a **narrow, fairly‑priced, quarantined subset of Balancer v3 LP tokens** — specifically the correlated‑LST, stable/pegged, and **Aave‑wrapped "100% Boosted"** pools — inside a **dedicated v4 Spoke** whose blast radius is capped by the Liquidity Hub. The single strongest argument: **a Balancer v3 Boosted‑pool BPT is already, under the hood, a basket of Aave aTokens.** Accepting it as collateral is closer to re‑collateralizing Aave's own deposits than to taking on an exotic outside asset.
-
-The honest bottom line, stated once, up front: **on today's post‑exploit TVL the dollars are small** (low‑single‑digit‑millions of incremental Aave revenue in the base case). The case is **strategic and forward‑leaning** — it is the right structure to have in place as Balancer v3 TVL recovers, it deepens the exact GHO/LST liquidity Aave already cares about, and it is a low‑footprint way for Aave v4 to demonstrate its headline feature (isolated, risk‑priced collateral) on a real, friendly counterparty.
+We do **not** ask Aave to re‑accept what broke. The defensible idea is a **narrow, dual‑bound‑priced, quarantined subset of Balancer v3 BPTs** inside a **dedicated, isolated v4 Spoke** — and, crucially, only **after** the strategy has been proven permissionlessly elsewhere and concrete gates are met. The honest cost/benefit (§5.6) does **not** close on today's TVL; this document says so plainly and builds the strategy around that fact.
 
 ---
 
 ## 1. Summary (TL;DR)
 
-- **Ask:** Establish a dedicated **"Balancer Collateral Spoke"** on Aave v4 (Ethereum) that accepts a whitelist of **Balancer v3** BPTs **as collateral only** (the BPT itself is non‑borrowable; users borrow Hub assets / **GHO** against it).
-- **Scope (v3 only):** (A) LST/LRT correlated pools, (B) stable/pegged pools, (C) **100% Boosted / Aave‑wrapped** pools. **Explicitly excludes all v2 pools** and all volatile/uncorrelated pools.
-- **Risk containment:** dedicated Spoke with a **capped Liquidity‑Hub credit line**, conservative caps sized to live pool depth, a high **Collateral Risk score** (v4 Risk Premium) so borrowers pay for the risk rather than socializing it, isolation‑style configuration, and a **pause/freeze** integration.
-- **Oracle (the crux):** **invariant‑based fair pricing** (never spot reserves) × **Chainlink / exchange‑rate** feeds, with **CAPO** growth bounds on rate providers, a **read‑only‑reentrancy guard** (revert if the Balancer Vault is unlocked/in‑context), and `getActualSupply()`.
-- **Why Aave benefits:** organic **GHO** borrow demand; deeper, stickier LST/stable liquidity (collateral keeps earning swap fees); a flagship demonstration of v4 risk isolation; tighter Balancer↔Aave↔GHO alignment.
-- **Why Balancer benefits:** a new utility sink for v3 BPTs (collateral that keeps LPing), sticky TVL, and a concrete reason to route v3 liquidity through Aave‑integrated pools.
-- **Rollout:** staged — TEMP CHECK → ARFC with a risk provider → **pilot Spoke with deliberately tiny caps on the 2–3 safest pools** → scale caps with TVL recovery and observed performance.
+- **Thesis:** The *structure* (a dedicated, isolated, collateral‑only Balancer Spoke on Aave v4) is sound and forward‑valuable. The *timing* is wrong for a direct Aave ask: post‑exploit TVL makes the dollars small (~0.1–1% of Aave revenue), Aave's Balancer‑friendly power brokers have all exited, and key preconditions (oracle admissibility, a funded Balancer‑v3 security commitment, a named Aave sponsor) are unmet.
+- **Recommended path (staged, evidence‑gated):**
+  - **Phase 0 — prove it permissionlessly.** List the target BPTs as collateral on **Morpho Blue / Euler v2** (permissionless, Balancer controls the oracle and LLTV, no governance vote). Gather real uptake, real liquidations, real oracle behavior. This de‑risks every assumption below with live evidence and costs no Aave political capital.
+  - **Phase 1 — approach Aave only when gates G1–G5 (§10) are met:** an audited, Chainlink‑path‑compatible **dual‑bound** BPT oracle; a falsifiable Balancer‑v3 **TVL‑recovery trigger**; a funded post‑Labs **v3 security commitment**; a **named Aave sponsor / LlamaRisk read‑through**; and Phase‑0 evidence.
+- **Scope (v3 only):** (A) LST/LRT correlated pools, (B) stable/pegged pools, (C) "100% Boosted"/Aave‑wrapped pools. **Excludes all v2 pools** and all volatile/uncorrelated pools.
+- **Pilot asset (revised):** lead with a **correlated‑LST pool (Tranche A)** whose constituents Aave *already* prices with sanctioned CAPO feeds (e.g. wstETH/WETH) — **not** the Boosted tranche. Tranche C is re‑classified as **highest‑scrutiny** (reflexive aToken loop), to be added later with explicit circuit‑breakers (§7.4).
+- **Oracle (the crux):** dual‑bound — **min(exchange‑rate, market)** for borrow/withdraw — delivered as a **Chainlink‑compatible adapter**, with a **hard depeg circuit‑breaker**, reentrancy guard, CAPO growth bounds, and `getActualSupply()`. **Admissibility under v4's Chainlink‑exclusive oracle design must be confirmed first (gate G1).**
+- **Risk containment:** dedicated Spoke, capped Liquidity‑Hub credit line, dynamic caps tied to live pool depth, high Collateral Risk score (v4 Risk Premium), a **committed backstop liquidator** for the pilot, and pause/freeze.
 
 ---
 
-## 2. Strategic rationale — why this pairing, and why now
+## 2. Strategic rationale — real, but narrower than it first appears
 
-### 2.1 Aave is already the home of correlated‑ETH leverage
+### 2.1 Aave is already the home of correlated‑ETH leverage (the strongest, cleanest argument)
 
-Aave is *the* venue where users lever correlated‑ETH assets. As of mid‑May 2026:
-- **weETH deposits ≈ $4.47B** on Aave Ethereum (2nd‑largest asset); weETH holders drive ~57.9% of all WETH borrowing (~$3.27B debt). ([ChainCatcher, Feb 2026](https://www.chaincatcher.com/en/article/2248017))
-- **wstETH** carries a supply cap of **810,000 wstETH (≈ $3B+)**; Aave holds roughly two‑thirds of all wstETH used as DeFi collateral. ([Aave gov supply caps, 2026‑05‑18](https://governance.aave.com/t/risk-stewards-supply-cap-changes-on-aave-v3-2026-05-18/24939), [Lido×Aave](https://aave.com/blog/lido-aave-case-study))
-- Combined, LSTs/LRTs back ~97.6% of WETH debt on Aave. **[VERIFY]**
+As of mid‑May 2026: **weETH deposits ≈ $4.47B** on Aave Ethereum; **wstETH** supply cap **810,000 (≈ $3B+)**; Aave holds ~two‑thirds of all DeFi wstETH; LSTs/LRTs back the large majority of WETH debt. ([ChainCatcher](https://www.chaincatcher.com/en/article/2248017) **[VERIFY exact %]**, [Aave gov 2026‑05‑18](https://governance.aave.com/t/risk-stewards-supply-cap-changes-on-aave-v3-2026-05-18/24939), [Lido×Aave](https://aave.com/blog/lido-aave-case-study))
 
-A Balancer **wstETH/WETH** or **rETH/wstETH** v3 pool is the *same* underlying risk profile Aave already concentrates in at multi‑billion scale — **plus** the BPT earns swap fees. The marginal risk Aave takes on by accepting the correlated‑LST BPT (with a sound oracle) is small relative to what it already holds; the marginal yield to the user is real.
+A Balancer **wstETH/WETH** v3 pool is the *same* correlated‑ETH risk Aave already concentrates in at multi‑billion scale — and its constituents already have Aave‑sanctioned Chainlink/CAPO feeds, which the BPT oracle can **compose** rather than invent. This is why the pilot should be Tranche A, not C: it is the most reviewer‑resistant, lowest‑novelty starting point.
 
-### 2.2 The Boosted‑pool synergy is the headline
+### 2.2 The Boosted‑pool relationship is a strategic alignment, but a *higher‑scrutiny* collateral
 
-Balancer **v3 "100% Boosted Pools"** route ~100% of idle pool liquidity into **Aave v3** as wrapped aTokens (e.g. `waUSDC`, `statATokens`), via Vault‑level **ERC‑4626 buffers**; LPs earn swap fees **on top of** Aave lending yield. ([Beets/Balancer "100% Boosted"](https://medium.com/balancer-protocol/100-boosted-pools-powered-by-aave-53fe5b920833), [The Block launch](https://www.theblock.co/post/330379/balancer-v3-launches-aave), [buffer docs](https://docs.balancer.fi/concepts/vault/buffer.html))
+Balancer **v3 "100% Boosted Pools"** route ~100% of idle liquidity into **Aave** as wrapped aTokens via Vault‑level ERC‑4626 buffers. ([Beets/Balancer](https://medium.com/balancer-protocol/100-boosted-pools-powered-by-aave-53fe5b920833), [The Block](https://www.theblock.co/post/330379/balancer-v3-launches-aave))
 
-Implication: **the collateral Aave would accept for a Boosted‑pool BPT is, by construction, mostly Aave aTokens.** Aave is being asked to lend against a tokenized claim on its own deposits plus a thin swap‑fee wrapper. This is the lowest‑risk, highest‑synergy slice and should be the pilot's first asset. (It also introduces a **reflexivity** caveat — see §6.4.)
+**Earlier drafts called this "lowest‑risk, pilot‑first." That was wrong, and the devil's‑advocate cycles corrected it.** A Boosted BPT priced off Aave's own aToken value means **Aave would be pricing collateral whose value Aave itself sets** — a self‑referential loop. Under stress (utilization spike, buffer depletion, an aToken redemption crunch) the BPT can stay marked near par while being un‑redeemable, so liquidators can't unwind and **bad debt accrues silently** — the CRV‑on‑Aave failure mode. It also generates the **least incremental value**, because a Boosted BPT is largely a wrapper around assets *already* supplied to Aave (little net‑new deposit; the user could borrow against the raw aToken position today). So Tranche C is best understood as **strategic alignment / sticky‑liquidity glue, and a *late*, circuit‑breaker‑gated collateral**, not the synergy that carries the proposal. (Full treatment: §7.4.)
 
-### 2.3 GHO demand
+### 2.3 GHO demand — incremental net of substitution, and a collateral‑quality question
 
-GHO is Aave v4's **native settlement asset** (~$584M supply, mid‑May 2026). ([DefiLlama/Aave](https://defillama.com/protocol/aave)) Borrowing against BPT collateral can be routed into GHO mint demand. A GHO/USDC **Boosted** pool already exists on Base ([Balancer Report](https://medium.com/balancer-protocol/the-balancer-report-e3937a2f735f)), which makes the loop self‑reinforcing: BPT collateral → GHO borrow → GHO liquidity that can itself sit in a Boosted pool. Across the opportunity scenarios (§5) this is **+$6M to +$70M** of incremental GHO demand (~1–12% of current supply).
+GHO is Aave v4's native settlement asset (~$584M supply). ([DefiLlama/Aave](https://defillama.com/protocol/aave)) Borrowing against BPT collateral *can* route into GHO, but much of that is **substitution** (GHO chosen over USDC/USDT), not net‑new demand. The honest incremental figure is well below the gross borrow number (§5.4). And a risk‑minded reader will ask the right question back: **does Aave *want* more GHO minted against correlated‑LP collateral**, given GHO peg stability prefers blue‑chip backing? The proposal should frame GHO as a *modest, quality‑bounded* upside, not a headline.
 
-### 2.4 Aave v4 was built for exactly this
+### 2.4 Aave v4 was built for isolating exactly this kind of collateral
 
-Aave v4 went live on Ethereum mainnet **30 March 2026** with a **Hub‑and‑Spoke** design: a single immutable **Liquidity Hub** holds assets and enforces solvency; upgradeable **Spokes** are user‑facing modules with their own collateral rules, caps, oracle config, and a Hub‑granted **credit line**. ([Aave: Understanding v4 Architecture](https://aave.com/blog/understanding-aave-v4s-architecture), [v4 GitHub overview](https://github.com/aave/aave-v4/blob/main/docs/overview.md), [The Block, 2026‑03‑30](https://www.theblock.co/post/395617/aave-v4-launches-ethereum-mainnet)) Two features make a BPT listing far safer than it would have been on v3:
-- **Risk isolation by Spoke.** A dedicated Spoke's exposure to the Hub is bounded by its credit line; a Balancer failure cannot drain the shared Hub or contaminate blue‑chip markets. ([Aave: v4 Risk Isolation](https://aave.com/blog/aave-v4-risk-isolation))
-- **Risk Premiums.** Each asset carries a **Collateral Risk score (0–1000%)**; a borrower pays a premium on top of the base rate proportional to their collateral's risk — so BPT risk is **priced to the borrower, not socialized** across the market. ([Aave: v4 Risk Premiums](https://aave.com/blog/aave-v4-risk-premiums))
+Aave v4 went live on Ethereum **30 March 2026**: a **Hub‑and‑Spoke** design where an immutable **Liquidity Hub** enforces solvency and grants each upgradeable **Spoke** a capped **credit line**; per‑asset **Risk Premiums** (Collateral Risk 0–1000%) price risk to the borrower, not the market. ([Understanding v4](https://aave.com/blog/understanding-aave-v4s-architecture), [v4 GitHub](https://github.com/aave/aave-v4/blob/main/docs/overview.md), [Risk Premiums](https://aave.com/blog/aave-v4-risk-premiums), [Risk Isolation](https://aave.com/blog/aave-v4-risk-isolation)) Precedents for purpose‑built/complex‑collateral Spokes: the **Babylon BTC Spoke** TEMP CHECK ([24911](https://governance.aave.com/t/temp-check-establish-babylon-spoke-and-onboard-babylon-native-btc/24911)) and **Pendle PT** onboarding ([PT‑USDG ARFC](https://governance.aave.com/t/arfc-onboard-pt-usdg-24sep2026-to-aave-v4-on-ethereum/24942)).
 
-Precedent that this is how v4 is actually being used: a **TEMP CHECK to establish a dedicated "Babylon Spoke" for native BTC** ([gov thread 24911](https://governance.aave.com/t/temp-check-establish-babylon-spoke-and-onboard-babylon-native-btc/24911)) and live **Pendle PT** onboarding to v4 ([PT‑USDG ARFC](https://governance.aave.com/t/arfc-onboard-pt-usdg-24sep2026-to-aave-v4-on-ethereum/24942)). A Balancer collateral‑only Spoke is squarely within this pattern.
+**Caveat (gate G1):** v4 standardized on **Chainlink as the exclusive oracle provider**, with Spokes consuming Chainlink feeds (incl. SVR for liquidation‑MEV recapture). There is no native Chainlink market feed for an arbitrary BPT, so the BPT oracle must be delivered as a **Chainlink‑compatible adapter**, and its registrability + SVR compatibility in a Spoke must be **confirmed in writing with Aave Labs/Chainlink before anything else.** This is a precondition the structure depends on, not a detail.
 
 ---
 
-## 3. Proposal specification
+## 3. Proposal specification (Phase 1 — for when gates are met)
 
 ### 3.1 Structure: a dedicated, collateral‑only Balancer Spoke
+- A purpose‑built **Spoke** listing a **whitelist of Balancer v3 BPTs as collateral only** (`borrowable = false`). Users supply a BPT and borrow Hub assets / GHO against it.
+- Exposure bounded by a **small, governance‑set Liquidity‑Hub credit line** — the hard ceiling on systemic risk.
+- Explicitly **not** a general Balancer money market — a constrained, single‑purpose collateral venue.
 
-- A purpose‑built **Spoke** that lists a **whitelist of Balancer v3 BPTs as collateral only** (`borrowable = false` for every BPT reserve). Users supply a BPT and borrow **Hub assets and/or GHO** against it.
-- The Spoke draws a **capped credit line** from the Liquidity Hub. This is the hard ceiling on systemic exposure: even a total loss inside the Spoke cannot exceed its credit line. Start the line **small** and raise it by governance as the book proves out.
-- This is explicitly **"not the broad Spoke we have discussed"** — it is a constrained, single‑purpose collateral venue, not a general Balancer money market.
+### 3.2 Eligible collateral (v3 only) — three tranches, re‑ordered by *scrutiny*
 
-### 3.2 Eligible collateral (v3 only) — three tranches
+| Tranche | Examples | Marginal credit risk | Reflexivity/novelty risk | Rollout order |
+|---|---|---|---|---|
+| **A — LST/LRT correlated** | wstETH/WETH, rETH/wstETH (established LSTs only) | Low (Aave holds same risk at $B scale) | Low (constituents already Aave‑priced) | **Pilot first** |
+| **B — Stable / pegged** | blue‑chip stable pools, GHO pairs **without** Aave aTokens | Low–Med (stable depeg tail) | Low | Second |
+| **C — Boosted / Aave‑wrapped** | Aave GHO/USDC, aUSDC/aUSDT boosted | Lowest *credit* risk | **Highest** (aToken circularity, buffer/utilization loop) | **Last, circuit‑breaker‑gated** |
 
-| Tranche | Examples | Why eligible | Initial treatment |
+**Hard exclusions:** all **v2** pools; algorithmic/newly‑launched LRTs without mature redemption; any pool with a mutable/un‑renounced rate provider or admin key (and note that a Boosted pool's rate provider, even if "immutable," points at *upgradeable* aTokens/ERC4626 wrappers — see §7.7); volatile/uncorrelated pools.
+
+### 3.3 Oracle design — dual‑bound, Chainlink‑path, circuit‑broken (the crux)
+
+Earlier drafts proposed a single‑sided exchange‑rate oracle. **That is the exact pattern behind the Resolv (~$20M) and ezETH ($56–65M) losses** (§7.1, §7.3) and was corrected in review. Requirements for each listed BPT oracle:
+
+1. **Invariant‑based fair value, never spot reserves.** Stable: `BPT ≈ D / actualSupply`; weighted: geometric‑mean fair value. ([valuing BPT](https://docs-v2.balancer.fi/concepts/advanced/valuing-bpt/valuing-bpt.html), [BPT oracle example](https://docs.balancer.fi/concepts/core-concepts/bpt-oracles/bpt-oracles-example.html))
+2. **Dual‑bound pricing (the key fix).** Price each yield‑bearing constituent at **min(exchange/redemption rate, market price)** for borrow/withdraw (conservative — can't be inflated by a stale redemption rate), and use a fair current price for liquidation. This adopts the Fluid asymmetry the benchmark praised but earlier drafts didn't actually implement.
+3. **Hard depeg circuit‑breaker.** Freeze new borrows when |market − redemption| exceeds a stated threshold (propose **1–2%**, set by the risk provider). This is what would have contained ezETH/Resolv.
+4. **Reentrancy guard.** v2: `VaultReentrancyLib.ensureNotInVaultContext`. v3: rely on the structural fix (transient accounting / Vault‑as‑ERC20 makes balances+supply atomic, closing the *classic* read‑only‑reentrancy class) **and** add the Gyroscope **unlocked‑Vault revert flag** as defense‑in‑depth against the *v3‑specific* transient "infinite‑mint‑mid‑tx" surface — a different vector, which is why both are warranted. ([reentrancy notice](https://forum.balancer.fi/t/reentrancy-vulnerability-scope-expanded/4345), [Gyro E‑CLP](https://docs.balancer.fi/concepts/explore-available-balancer-pools/gyroscope-pool/gyro-eclp.html))
+5. **CAPO growth bounds + freshness** on every rate provider, carefully calibrated — a stale CAPO reference caused a **$27M** mis‑liquidation on Aave on **10 March 2026**. ([CoinDesk](https://www.coindesk.com/business/2026/03/10/defi-lending-platform-aave-sees-a-rare-usd27-million-liquidations-after-a-price-glitch))
+6. **`getActualSupply()`**, never raw `totalSupply()`.
+7. **Tranche‑C add‑ons:** buffer‑health and reserve‑utilization thresholds that **auto‑freeze/haircut** when the buffer depletes or aToken redemption liquidity thins (the circularity break, §7.4).
+8. **Delivery:** Chainlink‑compatible adapter; **confirm registrability + SVR compatibility (gate G1).** Build with Chainlink/Gyroscope rather than as an unsanctioned bespoke contract.
+
+Reference implementations: Gyroscope `EclpLPOracle` (built to make BPTs lending collateral; origin of the unlocked‑Vault flag), Balancer v3 Geomean Oracle hook, Chainlink staked‑ETH feeds. ([Gyro](https://docs.balancer.fi/concepts/explore-available-balancer-pools/gyroscope-pool/gyro-eclp.html), [Geomean oracle](https://www.beirao.xyz/blog/ENG5-BalancerV3_TWAP_Oracle))
+
+### 3.4 Liquidation — and its economics (not just its code path)
+Mechanism: seize BPT → **`removeLiquidity` PROPORTIONAL** (all underlying pro‑rata, zero price impact) → sell basket (or, for Boosted pools, redeem underlying aTokens). ([liquidity types](https://docs.balancer.fi/concepts/vault/add-remove-liquidity-types.html))
+
+**The economics, not the code, are the risk.** At pilot scale, individual positions may be small; a custom BPT‑unwind keeper (gas‑heavy, MEV‑exposed, per‑pool) may be **net‑unprofitable**, so positions go unliquidated and bad debt accrues silently (the CRV lesson). Therefore the proposal MUST include:
+- a **liquidation P&L model** at realistic position sizes under *stressed* slippage (illustrative: a $30k position at a 5% bonus = $1.5k gross, minus gas + basket‑sell slippage during a depeg → frequently negative);
+- a **committed backstop liquidator** (Balancer‑funded keeper, or Aave Umbrella) for the pilot;
+- acceptance that the **liquidation bonus may need to be materially higher than 3–7%**, which in turn **lowers viable LTV** — the params in §3.5 are placeholders pending this model.
+
+### 3.5 Initial risk parameters (illustrative placeholders — a risk provider sets the real ones)
+| Parameter | Tranche A (LST) | Tranche B (Stable) | Tranche C (Boosted) |
 |---|---|---|---|
-| **C — Boosted / Aave‑wrapped** | Aave GHO/USDC, aUSDC/aUSDT boosted stable pools | BPT ≈ basket of Aave aTokens; lowest marginal risk | **Pilot first**, highest LTV within reason |
-| **A — LST/LRT correlated** | wstETH/WETH, rETH/wstETH (established LSTs only) | Same risk profile as Aave's existing multi‑$B LST book; minimal IL | Pilot second; exchange‑rate oracle |
-| **B — Stable / pegged** | Blue‑chip stable pools, GHO pairs | Low volatility, deep proportional exits | Pilot third; StableSurge‑hook pools preferred |
+| LTV | conservative (driven by liquidation P&L; likely **<70%** at pilot, not 80%) | conservative | low + util‑gated |
+| Liquidation Threshold | LTV + buffer vs **stressed** basket | + buffer | + buffer + circuit‑breaker |
+| Liquidation Bonus | sized to *stressed* proportional‑exit + sell slippage (may exceed 7%) | likewise | likewise |
+| Supply cap | small % of **live** pool TVL, dynamic | dynamic | dynamic + buffer‑linked |
+| Collateral Risk (premium) | moderate | moderate | high |
+| Borrowable | **No** | No | No |
+| Mode | dedicated Spoke / e‑mode‑style | dedicated Spoke | dedicated Spoke + auto‑freeze |
 
-**Hard exclusions:** all **v2** pools (the exploited surface); algorithmic or newly‑launched LRTs without a mature redemption mechanism; any pool with a mutable/un‑renounced rate provider or admin key (see §6.7); volatile/uncorrelated 80/20‑style pools (out of scope by audience decision).
-
-### 3.3 Oracle design — the make‑or‑break (specified, not hand‑waved)
-
-A BPT is only as safe as its price feed. The proposed oracle for each listed BPT MUST:
-
-1. **Price from the invariant, never from spot reserves.** Compute BPT value from the pool invariant and **independent external prices** (Chainlink market feeds and/or rate‑provider exchange rates), not from manipulable in‑pool balances. For stable pools, `BPT ≈ D / actualSupply` (D = invariant); for weighted pools, the geometric‑mean fair‑value formula. ([Balancer: valuing BPT](https://docs-v2.balancer.fi/concepts/advanced/valuing-bpt/valuing-bpt.html), [BPT oracle example](https://docs.balancer.fi/concepts/core-concepts/bpt-oracles/bpt-oracles-example.html))
-2. **Use `getActualSupply()`**, never raw `totalSupply()`.
-3. **Guard against read‑only reentrancy.** Revert if the Balancer Vault is mid‑operation: on v2, call `VaultReentrancyLib.ensureNotInVaultContext`; on **v3**, exploit the structural fix (transient accounting / Vault‑as‑ERC20 makes balances+supply atomic) **and** set an immutable flag that reverts all price/TVL reads while the Vault is `unlock()`‑ed (the Gyroscope pattern). ([Balancer reentrancy notice](https://forum.balancer.fi/t/reentrancy-vulnerability-scope-expanded/4345), [Gyro E‑CLP oracle](https://docs.balancer.fi/concepts/explore-available-balancer-pools/gyroscope-pool/gyro-eclp.html))
-4. **Bound rate‑provider growth with CAPO.** Wrap each yield‑bearing constituent's rate in Aave's **Correlated‑Asset Price Oracle**, capping `maxYearlyRatioGrowthPercent` and enforcing freshness so an inflated/stale rate cannot over‑value the BPT. ([CAPO framework](https://governance.aave.com/t/chaos-labs-correlated-asset-price-oracle-framework/16605), [bgd‑labs/aave‑capo](https://github.com/bgd-labs/aave-capo)) **Calibrate freshness carefully** — a stale CAPO reference caused a **$27M** mis‑liquidation on Aave on **10 March 2026** (wstETH valued at 1.19 vs 1.23 ETH). ([CoinDesk](https://www.coindesk.com/business/2026/03/10/defi-lending-platform-aave-sees-a-rare-usd27-million-liquidations-after-a-price-glitch))
-5. **Value collateral at a stressed (depeg) basket composition** for LT‑setting, not at par.
-
-Reference implementations to lean on: **Gyroscope's `EclpLPOracle`** (explicitly built to make Balancer BPTs usable as lending collateral, and the origin of the unlocked‑Vault revert flag), Balancer v3's **Geomean Oracle** hook, and Chainlink's staked‑ETH feeds (wstETH/rETH/cbETH). ([Gyro E‑CLP](https://docs.balancer.fi/concepts/explore-available-balancer-pools/gyroscope-pool/gyro-eclp.html), [Geomean oracle write‑up](https://www.beirao.xyz/blog/ENG5-BalancerV3_TWAP_Oracle))
-
-### 3.4 Initial risk parameters (illustrative — final values set by a risk provider at ARFC)
-
-These are **placeholders to anchor discussion**, deliberately conservative. They are *not* a substitute for a LlamaRisk/Chaos‑style parameterization (§8).
-
-| Parameter | Tranche C (Boosted) | Tranche A (LST) | Tranche B (Stable) |
-|---|---|---|---|
-| LTV | 70–80% | 70–80% | 70–80% |
-| Liquidation Threshold | +5–8pp over LTV | +5–8pp | +5–8pp |
-| Liquidation Bonus | sized to proportional‑exit slippage (≈3–7%) | ≈3–7% | ≈3–7% |
-| Supply cap | small % of **live** pool TVL | small % of live pool TVL | small % of live pool TVL |
-| Collateral Risk (v4 premium) | moderate | moderate–high | moderate |
-| Borrowable | **No (collateral only)** | No | No |
-| Mode | dedicated Spoke / isolation | dedicated Spoke / e‑mode‑style | dedicated Spoke |
-
-### 3.5 Liquidation path
-
-Liquidators seize the BPT and unwind via **`removeLiquidity` (PROPORTIONAL)** — burn BPT, receive all underlying pro‑rata, **zero price impact, no swap fee** — then sell the basket (or, for Boosted pools, **redeem the underlying Aave aTokens directly** — natural for Aave). Single‑asset exits are avoided in liquidation due to slippage. Supply caps must be sized so a full liquidation is a small fraction of pool TVL, and the liquidation bonus must cover realistic proportional‑exit + sell slippage. ([add/remove liquidity types](https://docs.balancer.fi/concepts/vault/add-remove-liquidity-types.html)) A working liquidator unwind path must be demonstrated on testnet before caps are raised.
-
-### 3.6 Staged rollout
-
-1. **TEMP CHECK** — sentiment, scope agreement.
-2. **ARFC** — risk provider attaches parameters; oracle implementation audited.
-3. **Pilot AIP** — launch the Spoke with **one** Boosted pool (Tranche C), tiny caps, low credit line.
-4. **Observe** — liquidation drills, oracle behavior, utilization, for a defined period.
-5. **Scale** — add Tranche A/B pools and raise caps via Risk‑Steward‑style adjustments, gated on Balancer v3 TVL recovery and clean operation.
+### 3.6 Rollout (Phase 1, post‑gates): pilot one Tranche‑A pool, tiny caps → drill liquidations → scale on evidence.
 
 ---
 
-## 4. How Fluid does it — the benchmark, and why our design differs
+## 4. How Fluid does it — the benchmark we partly adopt and partly reject
 
-The user asked specifically to study **Fluid (Instadapp)** as the reference for LP‑as‑collateral, while noting our proposal is deliberately *not* the same.
+**What Fluid does.** A vertically integrated DEX + lending system: **"Smart Collateral"** keeps a deposited LP position productive (backs a loan *and* earns swap fees + lending APR); **"Smart Debt"** makes the borrowed side productive too; a **tick/range batch‑liquidation** engine enables ~95% LTV on correlated pairs. TVL ≈ **$1.6B** (Apr 2026 — earlier "$1.6–1.9B" was rounded up). ([cyber.fund](https://cyber.fund/content/fluid-1), [Mirador](https://www.mirador.finance/p/fluid-liquidation-mechanism-a-closer), [Messari](https://messari.io/report/understanding-fluid-a-comprehensive-overview), [DefiLlama](https://defillama.com/protocol/fluid))
 
-**What Fluid does.** Fluid is a **vertically integrated** DEX + lending system on a shared Liquidity Layer. Its **"Smart Collateral"** lets a deposited two‑token position simultaneously (a) back a loan, (b) earn lending APR, and (c) act as AMM liquidity earning swap fees; **"Smart Debt"** lets the *borrowed* side also be productive liquidity. It uses a **tick/range batch‑liquidation** engine (Uniswap‑v3‑style ticks; partial liquidation of a whole at‑risk range in one tx; ~0.1% penalty, ~5% liquidated/event), which is what lets it run **~95% LTV** on correlated pairs. TVL ≈ **$1.6–1.9B** (Q2 2026). ([cyber.fund](https://cyber.fund/content/fluid-1), [Mirador on liquidations](https://www.mirador.finance/p/fluid-liquidation-mechanism-a-closer), [Messari](https://messari.io/report/understanding-fluid-a-comprehensive-overview)) **[VERIFY TVL]**
+**Adopt:** (i) **dual‑bound / asymmetric oracle conservatism** (now in §3.3); (ii) **liquidation batching** intuition for sizing the bonus; (iii) the **Resolv post‑mortem** — its ~$21M bad debt was a *hardcoded/exchange‑rate oracle* failure, the precise thing §3.3's dual‑bound design defends against. ([Blockonomi](https://blockonomi.com/fluid-covers-21m-bad-debt-after-resolv-exploit-outlines-recovery-plan/))
 
-**What transfers to our proposal:**
-- **Oracle discipline:** Fluid prices conservatively and asymmetrically (lowest‑recent price for borrow/withdraw; current/contract price for liquidation) with rate limits — a portable pattern for a BPT oracle.
-- **Liquidation engineering:** batching/range liquidation of correlated positions reduces gas, MEV, and penalty — relevant input to how Aave sizes the BPT liquidation bonus.
-- **The Resolv post‑mortem (Mar 2025):** Fluid took **~$21M bad debt** when a composite collateral (wstUSR) was bought cheap during a depeg and posted **at an inflated oracle price** to borrow against. The loss was an **oracle/collateral‑quality failure, not a liquidation‑engine failure** — exactly the risk a BPT oracle must defend against. ([Blockonomi](https://blockonomi.com/fluid-covers-21m-bad-debt-after-resolv-exploit-outlines-recovery-plan/))
-
-**What does NOT transfer (and why the comparison has limits):**
-- Fluid **owns its DEX**; its collateral *is* its own internal liquidity, so it controls minting, reserves, rebalancing, and the oracle center‑price. **Aave would accept an *external* Balancer LP token it does not control** — no shared liquidity layer, no internal rebalancing, no ability to keep the position "productive as Aave's own AMM."
-- **Smart Debt** is irrelevant (we accept LP **only as collateral**).
-- Fluid's "39x effective liquidity" capital‑efficiency is an artifact of integration and does **not** carry over.
-
-**Net:** borrow Fluid's *oracle conservatism* and *liquidation batching*, internalize the *Resolv lesson*, and discard the *vertical‑integration / Smart‑Debt* narrative — it presumes ownership of the venue producing the LP, which Aave will not have.
+**Reject as non‑transferable:** Fluid **owns its DEX**, so it controls minting, reserves, rebalancing, and the oracle center‑price; Aave would accept an **external** BPT it does not control. Smart Debt is irrelevant (collateral‑only). The "39x effective liquidity" is an integration artifact. **Critically, Fluid is therefore NOT a valid uptake comp** (see §5.3) — its adoption is a function of the integration we explicitly don't have.
 
 ---
 
-## 5. Market sizing and the opportunity model
+## 5. Market sizing — rebuilt bottom‑up, on *today's* TVL, with honest cost/benefit
 
-> **Data caveat:** in this environment, live data hosts (Balancer GraphQL API, DefiLlama, balancer.fi) were not reachable, so figures below come from cited reporting and must be **re‑pulled live before publishing** — especially Balancer 24h/30d volume and per‑pool TVL (from `api-v3.balancer.fi` `poolGetPools`). All sizing in §5.2–5.4 is **ESTIMATE** with stated assumptions.
+> **Data caveat:** live hosts (Balancer GraphQL API, DefiLlama, balancer.fi) were unreachable in this environment, so **§5 must be re‑built from a live `api-v3.balancer.fi` `poolGetPools` pull before publishing.** The category shares below are **explicitly placeholders** pending that pull — they are not sourced and must not be presented as fact.
 
 ### 5.1 Current scale (mid‑May 2026)
-
 | Metric | Value | Source |
 |---|---|---|
-| Balancer total TVL | ~$117M (v2 ~$41.75M + v3 ~$75.43M); ~$157M incl. CoW AMM/others **[VERIFY]** | [DefiLlama](https://defillama.com/protocol/balancer) |
-| Balancer pre‑exploit TVL | ~$800M (Oct/Nov 2025) | [CoinDesk](https://www.coindesk.com/web3/2025/11/27/balancer-dao-starts-discussing-usd8m-recovery-plan-after-usd110m-exploit-cut-tvl-by-two-thirds) |
-| Balancer 2021 peak | ~$3.5B | [CoinDesk](https://www.coindesk.com/tech/2026/03/24/balancer-labs-will-shut-down-as-corporate-entity-became-a-liability-after-usd110-million-exploit) |
-| v3 share of TVL | ~64% (and rising) | derived from DefiLlama splits |
-| Aave total TVL | ~$14.49B | [DefiLlama](https://defillama.com/protocol/aave) |
-| Aave supplied / borrowed | ~$14.86B / ~$11.12B (~74.8% util.) | [DefiLlama](https://defillama.com/protocol/aave) |
+| Balancer core TVL (v2 + v3) | **~$117M** (v2 ~$41.75M + v3 ~$75.43M). *The ~$157M figure elsewhere includes CoW AMM and other deployments that are out of scope — we use $117M as the denominator.* | [DefiLlama](https://defillama.com/protocol/balancer) **[VERIFY]** |
+| Balancer pre‑exploit / 2021 peak | ~$800M (Oct 2025) / ~$3.5B (2021) | [CoinDesk](https://www.coindesk.com/web3/2025/11/27/balancer-dao-starts-discussing-usd8m-recovery-plan-after-usd110m-exploit-cut-tvl-by-two-thirds) |
+| v3 share | ~64% (75.43 of 117.18 total) | derived |
+| Aave TVL / supplied / borrowed | ~$14.49B / ~$14.86B / ~$11.12B | [DefiLlama](https://defillama.com/protocol/aave) |
 | GHO supply | ~$584M | [DefiLlama](https://defillama.com/protocol/aave) |
-| Aave protocol revenue (annualized) | ~$89–100M | [DefiLlama](https://defillama.com/protocol/aave-v3) |
+| Aave annual revenue | ~$89–100M | [DefiLlama](https://defillama.com/protocol/aave-v3) |
 
-### 5.2 Addressable BPT collateral (the safe‑ish subset)
+### 5.2 Addressable BPT (placeholder shares — replace with live pool data)
+Pending the live pull, assume the three target tranches are a *majority* of v3 TVL by design (Balancer's design center is correlated/stable/boosted). **Base the model on v3 only (~$75M)**, since v2 is excluded: addressable ≈ **$45–65M today** (placeholder; confirm with `poolGetPools`). The model in §5.4 uses the **midpoint, ~$55M**.
 
-| Category | Est. share of Balancer TVL | On ~$117M today | On ~$300M recovery |
-|---|---|---|---|
-| Stable/pegged | 35–45% | $41–53M | $105–135M |
-| LST/LRT correlated | 20–30% | $23–35M | $60–90M |
-| Boosted/Aave‑wrapped | 15–25% | $18–29M | $45–75M |
-| **Addressable total (~70–90%)** | | **~$82–105M** | **~$210–270M** |
+### 5.3 Uptake — lowered, and Fluid dropped as a comp
+Earlier drafts used Fluid's ~$2B to justify **15–35%** uptake. **§4 disqualifies Fluid as a comp** (it owns its DEX). The only direct precedent for an *external* LP token in a *permissioned* lender is **Aave's own v2 AMM market — which failed.** There is **no clean comp showing high uptake**, so use a deliberately low planning range: **base 5–10%, optimistic 15%.** This is the most important quantitative correction in this revision.
 
-### 5.3 Uptake benchmark
+### 5.4 Opportunity model (explicit formula; no fabricated take‑rate)
+`Collateral = uptake × addressable`; `Borrow = Collateral × LTV`; **`Aave revenue = Borrow × borrowAPR × reserveFactor`** (for GHO, Aave captures the full borrow rate, no RF split). Assumptions stated each row.
 
-When a deep, trusted venue accepts an LP token, a meaningful share of that pool's supply migrates in. Fluid (whose entire model is LP‑as‑collateral) scaled to ~$2B of collateral; Aave already captures ~two‑thirds of DeFi wstETH. A defensible planning range is **15–30% uptake** of the addressable BPT base over 12–18 months. ([Messari/Fluid](https://messari.io/report/understanding-fluid-a-comprehensive-overview))
+**Today's base (addressable = $55M, the §5.2 midpoint, v3 only):**
+| Scenario | Uptake | LTV | borrowAPR×RF | Collateral | Borrow | Aave revenue/yr |
+|---|---|---|---|---|---|---|
+| Low | 5% | 55% | 4%×15% = 0.6% | $2.75M | $1.5M | **~$9k** |
+| Base | 8% | 60% | 5%×15% = 0.75% | $4.4M | $2.6M | **~$20k** |
+| Optimistic | 15% | 65% | 6%×15% = 0.9% | $8.25M | $5.4M | **~$48k** |
 
-### 5.4 Model (transparent; `Collateral = X·Y`, `Borrow = X·Y·Z`, `Aave rev ≈ Borrow × ~1–1.5%`)
+*(If borrows route to GHO at, say, a 5% gov‑set rate with full capture, multiply the rate term by ~6–8x → low‑hundreds‑of‑$k at the optimistic end. Still small.)*
 
-**Forward / recovery base (Y = $250M addressable):**
+**The honest conclusion is stark: on today's TVL, direct Aave revenue is ~$10k–$50k/yr (sub‑$0.5M even routing to GHO).** That does not justify a bespoke oracle audit + a dedicated Spoke + perpetual monitoring by a risk team that just lost Chaos and BGD. **This is why the recommendation is Phase 0 / evidence‑gated, not "approve now."**
 
-| Scenario | Uptake X | LTV Z | Collateral | Borrow unlocked | Aave annual revenue |
-|---|---|---|---|---|---|
-| Low | 10% | 60% | $25M | $15M | $0.15–0.23M |
-| Base | 20% | 70% | $50M | $35M | $0.35–0.53M |
-| High | 35% | 80% | $87.5M | $70M | $0.70–1.05M |
+### 5.5 Recovery is *optional upside*, gated by a falsifiable trigger — not a base‑case assumption
+Earlier drafts leaned on a ~2.5x "recovery to $250–300M." **Every structural force points down** (Labs winding down, BAL emissions ended, veBAL dismantled, reputational damage, providers gone). We therefore **do not assume recovery.** Instead, define a **falsifiable trigger (gate G2): only spend Aave‑facing effort once Balancer v3 TVL sustains > $300M for 90 days.** Bear case (TVL bleeds toward $50M): the strategy simply stays in Phase 0 indefinitely, at near‑zero cost.
 
-**Today's base (Y = $100M addressable):** Borrow unlocked ranges **$6M–$28M**, Aave revenue **$0.06–0.42M**.
+### 5.6 Fully‑loaded cost/benefit (the test the earlier draft skipped)
+| | One‑time | Recurring/yr |
+|---|---|---|
+| Chainlink‑compatible dual‑bound oracle build + **audit** | ~$50–150k **[ESTIMATE]** | — |
+| Spoke integration eng + governance process | meaningful | — |
+| Risk‑provider parameterization + monitoring (buffer/util/depeg) | — | ongoing risk‑team bandwidth |
+| Backstop liquidator funding (pilot) | — | keeper subsidy |
+| **Tail‑loss expectation** (a bad‑debt headline tying Aave to "the protocol that lost $128M") | — | low‑probability, high‑severity |
 
-**GHO demand:** if borrowing routes to GHO, **+$6M to +$70M** of GHO mint demand (~1–12% of current supply).
-
-**Balancer‑side uplift:** collateralized BPT keeps earning swap fees → **~$50K–$400K/yr** incremental, sticky fee revenue (ESTIMATE), and — more importantly — it deepens the LST/GHO pools Balancer wants to grow.
-
-**Honest read:** the immediate revenue is modest. The justification is **strategic** (right structure for the recovery), **risk‑adjusted** (same risk Aave already holds, but priced and isolated), and **synergistic** (GHO + Aave‑wrapped collateral). The upside scales ~linearly with Balancer v3 TVL recovery.
+**Against ~$10k–$50k/yr base revenue, the cost/benefit does not close today.** It plausibly *does* close — and the strategic/GHO/alignment case becomes real — **if** Phase 0 proves uptake and a clean liquidation record **and** v3 TVL recovers past the trigger. Hence the staged design.
 
 ---
 
-## 6. Risk assessment (candid)
+## 6. The permissionless alternative — and why it is Phase 0
 
-Severity is rated per tranche: **A** = LST/LRT, **B** = stable, **C** = Boosted.
+Earlier drafts never mentioned the obvious option, which the review flagged as a BLOCKER. **Morpho Blue lets anyone deploy an immutable lending market for any collateral — including a BPT — in minutes, with no governance vote, the lister choosing the oracle and LLTV** (~$6.8B+ TVL, 200+ markets); **Euler v2** is similarly permissionless. ([Morpho permissionless](https://eco.com/support/en/articles/14800888-morpho-blue-permissionless-lending-explained), [Morpho docs](https://docs.morpho.org/learn/concepts/market/))
+
+**Implication for Balancer:** we can list target BPTs as collateral **today**, control the oracle/LLTV ourselves, fund our own backstop keeper, and **generate exactly the live evidence** (uptake %, liquidation profitability, oracle behavior under stress) that every weak assumption in §5 currently lacks — **without spending any Aave political capital.** Aave offers only two things Morpho/Euler don't: GHO and the Boosted‑aToken loop — and §2.2–2.3 show both are weaker than they look.
+
+**Therefore Phase 0 = prove the model on Morpho/Euler.** Approach Aave (Phase 1) only with that evidence in hand and the §10 gates met. This converts a book‑talking pitch into an evidence‑gated strategy a hostile risk team can respect.
+
+---
+
+## 7. Risk assessment (candid)
+Severity per tranche: **A** = LST, **B** = stable, **C** = Boosted.
 
 | # | Risk | A | B | C | Primary mitigation |
 |---|---|:--:|:--:|:--:|---|
-| 1 | Oracle manipulation / mispricing | High | High | Med | Invariant fair pricing + Chainlink; reentrancy guard; CAPO bounds |
-| 2 | Impermanent loss / divergence | Low | Low | Low | LTV buffer ≫ baseline IL (<0.4% at 20% divergence) |
-| 3 | Depeg / correlation break | High | High | Med | Conservative LT vs stressed basket; isolation; circuit‑breaker; caps |
-| 4 | Smart‑contract / dependency / contagion | Med | High(v2)/Med(v3) | Med | **v3‑only**; capped Spoke credit line; pause integration |
-| 5 | Liquidation / unwind under stress | High | Med | Med | Proportional `exitPool`; caps ≪ pool depth; tested liquidator path |
-| 6 | Liquidity / exit | Med | Med | Med | Dynamic supply caps tied to live pool TVL |
-| 7 | Governance / param / admin keys | Med | Med | Med‑High | Whitelist only immutable/renounced rate providers; monitor & freeze |
+| 1 | Oracle manipulation/mispricing | High | High | Med | Invariant fair value + dual‑bound + reentrancy guard + CAPO |
+| 2 | IL / divergence | Low | Low | Low | LTV buffer ≫ benign IL (but see §7.2 on *fundamental* depeg) |
+| 3 | Depeg / correlation break | High | High | Med | **Dual‑bound oracle + depeg circuit‑breaker**; LT vs stressed basket |
+| 4 | SC/dependency/contagion | Med | High(v2)/Med(v3) | Med | **v3‑only**; capped credit line; pause; **funded v3 security (G4)** |
+| 5 | Liquidation **economics** | High | Med | Med | P&L model + **backstop keeper**; bonus sized to stressed slippage |
+| 6 | Liquidity/exit | Med | Med | Med | Dynamic caps tied to live pool TVL |
+| 7 | Governance/admin keys | Med | Med | **Med‑High** | Whitelist immutable/renounced; but see Boosted caveat §7.7 |
+| 8 | **Oracle admissibility on v4** | — | — | — | **Gate G1** — confirm custom adapter is registrable + SVR‑compatible |
+| 9 | **Reflexivity (Boosted)** | — | — | **High** | §7.4 circuit‑breakers; Tranche C last |
 
-### 6.1 Oracle manipulation — *the* risk
-Naive spot‑reserve pricing is flash‑loan‑manipulable; the **2023 Balancer read‑only reentrancy** enabled real losses downstream (**Sentiment ~$1M, Apr 2023; Sturdy ~$800K, Jun 2023**). The mitigation set in §3.3 (invariant fair pricing, reentrancy guard, CAPO, `getActualSupply`) is mandatory and well‑precedented. ([CertiK/Sturdy](https://www.certik.com/resources/blog/oracle-dependency-decrypting-the-sturdy-finance-attack))
+### 7.1 Oracle manipulation
+Spot pricing is flash‑loan‑manipulable; the 2023 read‑only reentrancy drove real losses (**Sentiment ~$1M; Sturdy ~$800k**). Mitigation set in §3.3 is mandatory. ([CertiK/Sturdy](https://www.certik.com/resources/blog/oracle-dependency-decrypting-the-sturdy-finance-attack))
 
-### 6.2 Impermanent loss — low
-For correlated/stable baskets, IL is negligible (≈0.03% at 5% divergence; ≈0.4% at 20%). A 5–8pp LTV→LT buffer absorbs steady‑state IL comfortably.
+### 7.2 IL — low for *price* divergence, but not the real tail
+Benign IL is small for correlated pairs. **But the dangerous case is a *fundamental* depeg (slashing, broken redemption), which is not transient** — earlier drafts' precise IL figures (e.g. "0.4% at 20%") understated this and are dropped as misleadingly benign.
 
-### 6.3 Depeg — the scary tail
-A StableSwap‑style pool absorbs a depegging constituent disproportionately, so a BPT can fall **faster than a naive average** exactly when exit liquidity is worst. Precedents: **stETH −6–7% (Jun 2022)**, **USDC −12–13% (11 Mar 2023)**, **ezETH −79% in <1hr (24 Apr 2024)** → **$56–65M liquidations** across Gearbox/Morpho. ([DLNews ezETH](https://www.dlnews.com/articles/defi/renzos-ezeth-loses-ether-peg-drops-79-in-under-one-hour/)) Mitigation: exchange‑rate (redemption‑rate) oracles for LSTs (ignore transient market dislocations), LT set against a stressed basket, isolation, freeze capability, and **exclusion of immature/algorithmic LRTs**. Residual: an exchange‑rate oracle over‑values a *fundamentally* broken asset — bounded by caps, not eliminable.
+### 7.3 Depeg — the kill‑shot, now mitigated honestly
+A StableSwap pool absorbs a depegging asset disproportionately, so a BPT can fall faster than a naive average. Precedents: **stETH −6–7% (Jun 2022)**, **USDC −12–13% (Mar 2023)**, **ezETH −79% in <1hr (Apr 2024) → $56–65M liquidations**. ([DLNews](https://www.dlnews.com/articles/defi/renzos-ezeth-loses-ether-peg-drops-79-in-under-one-hour/)) **A single‑sided exchange‑rate oracle is the cause of these losses, not the cure** (Resolv hardcoded wstUSR at $1.13 while it traded $0.63). The fix — and the correction from earlier drafts — is the **dual‑bound oracle + depeg circuit‑breaker** of §3.3, plus exclusion of immature/algorithmic LRTs. Residual (a fundamentally broken asset still over‑valued at the *floor* of two bounds) is bounded by caps, not eliminable.
 
-### 6.4 Contagion & the Boosted‑pool reflexivity caveat
-The **Nov 2025 $128M** exploit hit **v2 Composable Stable Pools only** — listing **v3** sidesteps that exact code path, the single most important scoping decision in this proposal. Remaining: Aave inherits Balancer **v3 Vault** smart‑contract risk (bounded by the Spoke credit line). **Reflexivity:** a Boosted‑pool BPT holds Aave aTokens; using it as Aave collateral creates a loop where Aave‑side stress (utilization spike, aToken liquidity crunch) feeds back into the very collateral meant to backstop it. Mitigation: avoid double‑counting circular aToken exposure in risk scoring, monitor buffer health, and cap Tranche C conservatively despite its low headline risk.
+### 7.4 Reflexivity in Boosted pools (Tranche C) — re‑rated to HIGH
+A Boosted BPT is a basket of `waUSDC`/`statAToken` priced off Aave's own aToken value via `previewRedeem`/`getRate()`. Failure sequence: **(1)** underlying‑reserve utilization spikes (organically, or engineered via the GHO loop in §2.3); **(2)** instant aToken redemption liquidity dries up and the Balancer Vault buffer depletes, so `previewRedeem` stops reflecting realizable value; **(3)** the BPT stays marked near par → borrowers look healthy while collateral is un‑redeemable; **(4)** proportional exit returns aTokens that can't be redeemed at par → liquidators decline → **silent bad debt.** Mitigation is **not** a hand‑wave: §3.3 #7 mandates **buffer‑health + utilization auto‑freeze/haircut thresholds**, the circularity must be modeled in the Risk Premium (no double‑counting Aave's own exposure as independent collateral), and a liquidation must be demonstrated *when aTokens cannot redeem at par.* **Tranche C is therefore last and highest‑scrutiny — not the pilot.**
 
-### 6.5 Liquidation under stress
-**Cautionary tale: CRV‑on‑Aave (Nov 2022)** — an engineered position left Aave with **~$1.6M bad debt** and permanently hardened Aave toward illiquid/manipulable collateral. ([The Defiant](https://thedefiant.io/news/defi/crv-trade-aave-bad-debt)) For BPTs: proportional exit is clean in normal conditions but returns a worst‑composition basket if the pool is itself imbalanced/under attack. Size caps so a full liquidation is a small fraction of pool TVL.
+### 7.5 Liquidation economics
+**CRV‑on‑Aave (Nov 2022, ~$1.6M bad debt)** is the cautionary tale. A *tested* path proves code runs; it does **not** prove anyone runs it unprofitably at small scale. See §3.4 (P&L model + backstop keeper). ([The Defiant](https://thedefiant.io/news/defi/crv-trade-aave-bad-debt))
 
-### 6.6 Liquidity/exit
-Large BPT collateral can't be unwound without moving the price of the collateral itself. Bind supply caps to a small % of **live** pool TVL, ratcheting down if TVL shrinks.
+### 7.6 Liquidity/exit — dynamic caps as a small % of live pool TVL, ratcheting down with TVL.
 
-### 6.7 Governance/admin‑key
-Balancer governance / pool admins can change swap fees, the amplification factor, **pause** a pool, or **upgrade a rate provider** (≈ oracle compromise). Whitelist only pools with immutable/renounced or time‑locked, audited control, and freeze the Aave reserve on any privileged change.
+### 7.7 Governance/admin keys — and the Boosted false‑guarantee
+Whitelist only immutable/renounced or time‑locked rate providers. **Caveat for Tranche C:** a Boosted pool's rate provider, even if itself immutable, points at **upgradeable** Aave aTokens / ERC4626 wrappers — so "immutable rate provider" is **not** a sufficient guarantee for C. Another reason C is last.
 
-### 6.8 Residual risk (stated plainly)
-Even a perfectly scoped listing inherits: (a) Balancer v3 Vault contract risk, (b) the fundamental‑depeg tail where an exchange‑rate oracle over‑values a broken asset, and (c) **Aave's own oracle‑config risk** (cf. the Mar‑2026 CAPO $27M event). None is fully eliminable — only **bounded** by v3‑only scope, the capped Spoke, conservative caps, and risk‑priced premiums.
+### 7.8 Residual (stated plainly)
+Inherits Balancer v3 Vault contract risk; the fundamental‑depeg tail; Aave's own oracle‑config risk (Mar‑2026 CAPO $27M); and "v3 untouched" is **survivorship bias** (v2's bug also sat un‑exploited for years). All **bounded, not eliminated.**
 
 ---
 
-## 7. Anticipated objections & responses (forum‑facing)
-
+## 8. Anticipated objections & responses (forum‑facing)
 | Objection | Response |
 |---|---|
-| "Balancer just got hacked for $128M." | The exploit was **v2 Composable Stable Pools**; **v3 was untouched**. This proposal is **v3‑only** and excludes the exact code path that broke. |
-| "Balancer Labs is winding down — who maintains the contracts?" | Address head‑on (§8.3): v3 contracts are immutable/audited; the DAO/OpCo and ecosystem continue maintenance; the Spoke's exposure is capped regardless. *We need a crisp, sourced maintenance answer before TEMP CHECK.* |
-| "Aave already deprecated LP collateral (v2 AMM market)." | That was v1‑era shared‑pool risk with naive oracles and no isolation. v4's Spoke isolation + Risk Premiums + a modern fair‑value oracle are a different regime; and Boosted BPTs (≈ Aave aTokens) didn't exist then. |
-| "LP oracles are dangerous." | Correct historically — which is why §3.3 mandates invariant fair pricing, reentrancy guards, CAPO, and the Gyroscope unlocked‑Vault pattern, with an audited implementation as a gating condition. |
-| "Liquidations will fail in a crisis." | Proportional exits are clean; caps are sized to pool depth; a liquidator drill is a gating condition before caps rise. |
-| "The numbers are too small to bother." | True today; the ask is a **low‑footprint pilot** that scales with recovery and demonstrates v4's flagship isolation feature on a friendly counterparty, while growing GHO. |
+| "Balancer just got hacked for $128M." | v2 Composable Stable Pools; **v3 untouched**. Scope is **v3‑only**, excluding that code path — while acknowledging v3 is *audited‑and‑bounded*, not *proven*. |
+| "Who maintains v3 now that Labs is winding down?" | **Gate G4** — we bring a funded, sourced post‑Labs security commitment (bounty $, audit cadence, named maintainer, IR SLA) *before* TEMP CHECK; exposure is capped regardless. |
+| "Aave already deprecated LP collateral." | v1‑era shared‑pool risk + naive oracles + no isolation. v4 Spoke isolation + Risk Premiums + a dual‑bound audited oracle is a different regime. |
+| "LP oracles are dangerous / can a Spoke even use one?" | Correct historically — hence §3.3's dual‑bound design **and gate G1** (confirm Chainlink‑adapter registrability + SVR) as a precondition. |
+| "Liquidations fail in a crisis." | §3.4 P&L model + committed backstop keeper + drill as a gating condition; bonus sized to stressed slippage. |
+| "Boosted = circular." | Conceded — Tranche C is **last, highest‑scrutiny**, with explicit buffer/utilization circuit‑breakers (§7.4). Pilot is Tranche A. |
+| "Numbers are tiny." | True today — which is why we **prove it on Morpho/Euler first** and gate the Aave ask on a TVL trigger; we are not asking Aave to build for hoped‑for TVL. |
 
 ---
 
-## 8. INTERNAL — governance reality check (trim before posting)
-
-### 8.1 The political map has gotten worse for us
-- **ACI / Marc Zeller** — historically the governance kingmaker **and Balancer‑friendly** (authored the original AMM market) — **announced an exit in March 2026.** Losing ACI removes our most natural sponsor. ([ACI is leaving Aave](https://governance.aave.com/t/aci-is-leaving-aave/24205))
-- **Chaos Labs** (risk) and **BGD Labs** (core dev) **both exited (~April 2026).** ([Chaos Labs leaving](https://governance.aave.com/t/chaos-labs-is-leaving-aave/24386))
-- **LlamaRisk** is now the primary risk provider and the gate we must convince. ([LlamaRisk continuity](https://governance.aave.com/t/llamarisk-ensuring-continuity-of-aaves-risk-management/24397))
-- **Aave Labs / Stani Kulechov** consolidated control via the **"Aave Will Win"** vote (finalized ~Apr 2026). **Aave Labs' buy‑in is now effectively the gate.** ([CoinDesk](https://www.coindesk.com/tech/2026/04/13/aave-passes-landmark-vote-ending-months-long-fight-over-who-controls-protocol-revenue))
-
-**Implication:** secure informal Aave Labs + LlamaRisk alignment *before* a public TEMP CHECK. Lead with GHO and the v4‑isolation showcase (things Aave Labs wants), not with "help Balancer."
-
-### 8.2 Our best levers
-- The **live v3↔Aave↔GHO Boosted‑pool partnership** is real, mutually beneficial, and survived the exploit unscathed — lead with it. ([Balancer v3 × Aave](https://www.theblock.co/post/330379/balancer-v3-launches-aave))
-- **Marcus is already engaged** in the v4 launch roadmap thread as "Marcus‑Balancer." ([v4 roadmap thread](https://governance.aave.com/t/aave-v4-launch-roadmap/23134/6)) Use that relationship.
-- A prior **Gauntlet "Market Risks of Listing LP Tokens as Collateral"** analysis exists — read it and pre‑empt it. ([gov thread 10573](https://governance.aave.com/t/gauntlet-analysis-market-risks-of-listing-lp-tokens-as-collateral/10573))
-
-### 8.3 Open items to close before TEMP CHECK
-1. **Balancer v3 maintenance/security answer** post‑Labs‑windown (who patches, who runs the bug bounty, audit cadence). This is the first question an Aave delegate asks.
-2. **Live numbers** from `api-v3.balancer.fi` (per‑pool TVL, 24h/30d volume, fees, the exact list of live Boosted pools and their rate providers/admin keys).
-3. **Audited reference oracle** (Gyroscope‑style) for the specific pilot pool.
-4. **Testnet liquidation drill** evidence.
-5. Confirm whether the 2022 "Staked aTokens" BPT‑collateral integration ever shipped (evidence suggests **no**) — frame this as first‑of‑kind on v4.
+## 9. INTERNAL — governance reality check (trim before posting)
+- **The political map worsened for us in 2026.** ACI/**Marc Zeller** (our most natural sponsor, authored the original AMM market) — **exited March 2026** ([ACI leaving](https://governance.aave.com/t/aci-is-leaving-aave/24205)). **Chaos Labs** and **BGD Labs** both **exited ~April 2026** ([Chaos leaving](https://governance.aave.com/t/chaos-labs-is-leaving-aave/24386)). **LlamaRisk** is now the gate ([continuity](https://governance.aave.com/t/llamarisk-ensuring-continuity-of-aaves-risk-management/24397)). **Aave Labs/Stani** consolidated control via **"Aave Will Win"** (Apr 2026) — **their buy‑in is effectively the gate** ([CoinDesk](https://www.coindesk.com/tech/2026/04/13/aave-passes-landmark-vote-ending-months-long-fight-over-who-controls-protocol-revenue)).
+- **Without a named sponsor inside the current power structure, this is dead on arrival** — securing one is **gate G5**, not an afterthought.
+- **Best levers:** the live v3↔Aave↔GHO Boosted partnership (survived the exploit) ([v3×Aave](https://www.theblock.co/post/330379/balancer-v3-launches-aave)); Marcus already engaged as "Marcus‑Balancer" in the v4 roadmap thread ([23134](https://governance.aave.com/t/aave-v4-launch-roadmap/23134/6)); pre‑empt the prior **Gauntlet LP‑collateral risk analysis** ([10573](https://governance.aave.com/t/gauntlet-analysis-market-risks-of-listing-lp-tokens-as-collateral/10573)).
 
 ---
 
-## 9. Recommended path
+## 10. Recommended path & gating conditions
 
-1. **Do not rush to a public TEMP CHECK.** First close the §8.3 open items and get informal LlamaRisk + Aave Labs read‑throughs.
-2. **Pilot‑first framing:** propose a single Boosted (Tranche C) pool, tiny caps, capped credit line — a demonstrably low‑risk showcase of v4 isolation that grows GHO.
-3. **Scale on evidence:** add Tranche A/B and raise caps only on clean operation + Balancer v3 TVL recovery.
-4. **Sequence the message:** GHO + v4‑isolation showcase first; Balancer benefit second.
+**Phase 0 (now, low cost, high learning):** list target v3 BPTs as collateral on **Morpho Blue / Euler v2**; fund a backstop keeper; instrument uptake, liquidation P&L, and oracle behavior. Build + audit the **dual‑bound Chainlink‑compatible BPT oracle** here, where it's also useful.
 
----
+**Phase 1 (approach Aave only when ALL gates are met):**
+- **G1 — Oracle admissibility:** written confirmation that a custom BPT oracle adapter is registrable in a v4 Spoke and SVR‑compatible.
+- **G2 — TVL trigger:** Balancer v3 TVL sustains **> $300M for 90 days** (falsifiable; until then, stay in Phase 0).
+- **G3 — Phase‑0 evidence:** real uptake + a clean liquidation record on Morpho/Euler.
+- **G4 — Security commitment:** funded, sourced post‑Labs v3 security (bounty $, audit cadence, named maintainer, IR SLA).
+- **G5 — Sponsor:** a named Aave‑side sponsor / pre‑secured LlamaRisk read‑through.
 
-## 10. Appendices
-
-### Appendix A — Key sources
-*(Consolidated; full inline citations above.)*
-- **Aave v4:** [architecture](https://aave.com/blog/understanding-aave-v4s-architecture), [GitHub overview](https://github.com/aave/aave-v4/blob/main/docs/overview.md), [risk premiums](https://aave.com/blog/aave-v4-risk-premiums), [risk isolation](https://aave.com/blog/aave-v4-risk-isolation), [launch (The Block)](https://www.theblock.co/post/395617/aave-v4-launches-ethereum-mainnet)
-- **Spoke precedents:** [Babylon Spoke TEMP CHECK](https://governance.aave.com/t/temp-check-establish-babylon-spoke-and-onboard-babylon-native-btc/24911), [PT‑USDG v4 ARFC](https://governance.aave.com/t/arfc-onboard-pt-usdg-24sep2026-to-aave-v4-on-ethereum/24942)
-- **Balancer v3 / Boosted / buffers:** [v3 overview](https://docs.balancer.fi/partner-onboarding/balancer-v3/v3-overview.html), [100% Boosted](https://medium.com/balancer-protocol/100-boosted-pools-powered-by-aave-53fe5b920833), [buffers](https://docs.balancer.fi/concepts/vault/buffer.html), [v3×Aave launch](https://www.theblock.co/post/330379/balancer-v3-launches-aave)
-- **BPT pricing / oracles:** [valuing BPT](https://docs-v2.balancer.fi/concepts/advanced/valuing-bpt/valuing-bpt.html), [BPT oracle example](https://docs.balancer.fi/concepts/core-concepts/bpt-oracles/bpt-oracles-example.html), [Gyro E‑CLP](https://docs.balancer.fi/concepts/explore-available-balancer-pools/gyroscope-pool/gyro-eclp.html), [reentrancy notice](https://forum.balancer.fi/t/reentrancy-vulnerability-scope-expanded/4345), [CAPO](https://github.com/bgd-labs/aave-capo)
-- **Incidents:** [Balancer v2 $128M (Check Point)](https://research.checkpoint.com/2025/how-an-attacker-drained-128m-from-balancer-through-rounding-error-exploitation/), [OpenZeppelin](https://www.openzeppelin.com/news/understanding-the-balancer-v2-exploit), [ezETH depeg](https://www.dlnews.com/articles/defi/renzos-ezeth-loses-ether-peg-drops-79-in-under-one-hour/), [CRV‑on‑Aave](https://thedefiant.io/news/defi/crv-trade-aave-bad-debt), [Aave CAPO $27M](https://www.coindesk.com/business/2026/03/10/defi-lending-platform-aave-sees-a-rare-usd27-million-liquidations-after-a-price-glitch), [Sturdy/CertiK](https://www.certik.com/resources/blog/oracle-dependency-decrypting-the-sturdy-finance-attack)
-- **Fluid:** [cyber.fund](https://cyber.fund/content/fluid-1), [Mirador liquidations](https://www.mirador.finance/p/fluid-liquidation-mechanism-a-closer), [Messari](https://messari.io/report/understanding-fluid-a-comprehensive-overview), [Resolv bad debt](https://blockonomi.com/fluid-covers-21m-bad-debt-after-resolv-exploit-outlines-recovery-plan/)
-- **Numbers:** [DefiLlama Balancer](https://defillama.com/protocol/balancer) / [v3](https://defillama.com/protocol/balancer-v3) / [Aave](https://defillama.com/protocol/aave); [exploit/windown (CoinDesk)](https://www.coindesk.com/tech/2026/03/24/balancer-labs-will-shut-down-as-corporate-entity-became-a-liability-after-usd110-million-exploit); [LST concentration](https://www.chaincatcher.com/en/article/2248017)
-- **Governance shifts:** [ACI exit](https://governance.aave.com/t/aci-is-leaving-aave/24205), [Chaos Labs exit](https://governance.aave.com/t/chaos-labs-is-leaving-aave/24386), [Aave Will Win](https://www.coindesk.com/tech/2026/04/13/aave-passes-landmark-vote-ending-months-long-fight-over-who-controls-protocol-revenue)
-
-### Appendix B — Verification to‑do (data not fetchable in this environment)
-Live Balancer per‑pool TVL/volume/fees and Boosted‑pool list (`api-v3.balancer.fi`); current Balancer total TVL reconciliation ($117M v2+v3 vs ~$157M incl. CoW AMM); Aave live collateral list; whether "Staked aTokens" (2022) shipped; LlamaRisk/Chaos scoring rubrics from primary docs.
-
-### Appendix C — Devil's‑advocate stress test
-*(See §11 below — this log is updated across review cycles.)*
+**Phase 1 sequence (post‑gates):** TEMP CHECK → ARFC (risk provider sets params on the §3.4 P&L) → pilot AIP: **one Tranche‑A pool, tiny caps, low credit line** → liquidation drill → scale to B, then (circuit‑breaker‑gated) C, on evidence.
 
 ---
 
-## 11. Devil's‑advocate stress‑test log
+## 11. Appendices
+### A — Key sources
+*(Consolidated; full inline citations above.)* Aave v4: [architecture](https://aave.com/blog/understanding-aave-v4s-architecture), [GitHub](https://github.com/aave/aave-v4/blob/main/docs/overview.md), [risk premiums](https://aave.com/blog/aave-v4-risk-premiums), [risk isolation](https://aave.com/blog/aave-v4-risk-isolation), [launch](https://www.theblock.co/post/395617/aave-v4-launches-ethereum-mainnet) · Spoke precedents: [Babylon](https://governance.aave.com/t/temp-check-establish-babylon-spoke-and-onboard-babylon-native-btc/24911), [PT‑USDG](https://governance.aave.com/t/arfc-onboard-pt-usdg-24sep2026-to-aave-v4-on-ethereum/24942) · Balancer v3/Boosted: [v3 overview](https://docs.balancer.fi/partner-onboarding/balancer-v3/v3-overview.html), [100% Boosted](https://medium.com/balancer-protocol/100-boosted-pools-powered-by-aave-53fe5b920833), [buffers](https://docs.balancer.fi/concepts/vault/buffer.html) · Oracles: [valuing BPT](https://docs-v2.balancer.fi/concepts/advanced/valuing-bpt/valuing-bpt.html), [Gyro E‑CLP](https://docs.balancer.fi/concepts/explore-available-balancer-pools/gyroscope-pool/gyro-eclp.html), [reentrancy](https://forum.balancer.fi/t/reentrancy-vulnerability-scope-expanded/4345), [CAPO](https://github.com/bgd-labs/aave-capo) · Incidents: [Balancer v2 $128M](https://research.checkpoint.com/2025/how-an-attacker-drained-128m-from-balancer-through-rounding-error-exploitation/), [ezETH](https://www.dlnews.com/articles/defi/renzos-ezeth-loses-ether-peg-drops-79-in-under-one-hour/), [CRV‑on‑Aave](https://thedefiant.io/news/defi/crv-trade-aave-bad-debt), [Aave CAPO $27M](https://www.coindesk.com/business/2026/03/10/defi-lending-platform-aave-sees-a-rare-usd27-million-liquidations-after-a-price-glitch), [Resolv/Fluid](https://blockonomi.com/fluid-covers-21m-bad-debt-after-resolv-exploit-outlines-recovery-plan/) · Fluid: [cyber.fund](https://cyber.fund/content/fluid-1), [Messari](https://messari.io/report/understanding-fluid-a-comprehensive-overview) · Permissionless alt: [Morpho](https://docs.morpho.org/learn/concepts/market/) · Numbers: [DefiLlama Balancer](https://defillama.com/protocol/balancer)/[v3](https://defillama.com/protocol/balancer-v3)/[Aave](https://defillama.com/protocol/aave) · Governance: [ACI exit](https://governance.aave.com/t/aci-is-leaving-aave/24205), [Chaos exit](https://governance.aave.com/t/chaos-labs-is-leaving-aave/24386), [Aave Will Win](https://www.coindesk.com/tech/2026/04/13/aave-passes-landmark-vote-ending-months-long-fight-over-who-controls-protocol-revenue)
 
-*Cycle 0 (initial draft) complete. Adversarial cycles to follow.*
+### B — Verification to‑do (data not fetchable in this environment)
+Live `api-v3.balancer.fi` `poolGetPools` (per‑pool TVL/volume/fees, exact Boosted‑pool list + rate‑provider/admin keys → replaces all §5 placeholders); reconcile $117M vs $157M denominator; exact LST‑share of WETH debt; Aave live collateral list; whether "Staked aTokens" (2022) ever shipped; LlamaRisk/Chaos scoring rubrics from primary docs; **confirm v4 custom‑oracle registrability + SVR (G1).**
+
+### C — Devil's‑advocate stress‑test log → §12.
+
+---
+
+## 12. Devil's‑advocate stress‑test log (5 cycles)
+
+**Cycle 1 — Hostile Aave risk reviewer (independent agent).** Surfaced: (1) **oracle admissibility** under v4 Chainlink‑exclusivity is an unconfirmed *precondition* → added **gate G1** + Chainlink‑adapter delivery (§2.4, §3.3 #8). (2) **Tranche C is the most dangerous, not least** (aToken circularity / buffer doom‑loop) → re‑ranked C to last/highest‑scrutiny, added circuit‑breakers (§2.2, §3.3 #7, §7.4). (3) **Exchange‑rate oracle = Resolv/ezETH kill‑shot** → replaced with **dual‑bound min(rate, market) + depeg circuit‑breaker** (§3.3 #2‑3, §7.3). (4) Liquidation *economics* (not code) → P&L model + backstop keeper (§3.4). (5) Maintenance of winding‑down dependency + survivorship bias → gate G4, §7.8. (6) Cost/benefit doesn't close → §5.6. (7) Governance wishful → gate G5.
+
+**Cycle 2 — Numbers/strategy cynic (independent agent).** Surfaced: (1) invented category shares + fabricated "1–1.5% of borrows" take‑rate → explicit formula `Borrow×APR×RF`, shares marked placeholder pending live pull (§5.2, §5.4). (2) Fluid invalid as uptake comp (disqualified in §4) → dropped; uptake lowered to **5–15%** (§5.3). (3) TVL recovery = hopium → recovery made *optional upside* behind falsifiable trigger G2; base case on today's TVL (§5.5). (4) Boosted "synergy" partly an accounting illusion / least incremental value → §2.2 rewritten. (5) GHO demand is substitution + collateral‑quality question → §2.3. (6) Value lopsided to Balancer; **Morpho/Euler permissionless alternative missing** → new §6 + Phase 0.
+
+**Cycle 3 — Self‑audit for internal consistency.** Reconciled the §3.3 "transient fix *and* revert flag" contradiction (different vectors: classic read‑only reentrancy vs v3 transient infinite‑mint). Removed false‑precision IL figures (§7.2). Flagged the "immutable rate provider" false guarantee for Boosted pools (upgradeable underlying) (§7.7). Ensured the pilot asset (Tranche A) is consistent across TL;DR, §3.2, §3.6, §10.
+
+**Cycle 4 — Self‑audit for "would this survive first contact."** Confirmed every quantitative claim is either sourced, marked [VERIFY], or labeled placeholder/ESTIMATE; that the cost/benefit (§5.6) is shown rather than asserted; that GHO is framed as bounded upside not headline; and that the document's own thesis (prove‑elsewhere‑first) is internally coherent with the small numbers rather than contradicting them.
+
+**Cycle 5 — Independent fresh‑eyes verification (agent).** Confirmed cycles 1–4 were genuinely fixed (not papered over): G1 oracle admissibility is load‑bearing and factually correct (v4 *is* Chainlink‑exclusive incl. SVR — verified); Tranche‑C reflexivity re‑rating and the Tranche‑A pilot are consistent across all sections; the dual‑bound oracle is tied to the Resolv/ezETH root cause; liquidation economics correctly link a higher bonus to lower viable LTV; the §5.4 scenario arithmetic checks out ($9k/$20k/$48k). Caught and fixed here: a §5.1 v3‑share parenthetical error, the $45–65M (prose) vs $55M (model) addressable mismatch (now cross‑referenced to the midpoint), and this log entry. **Net verdict: READY as an internal Balancer strategy document; NOT YET a public TEMP CHECK (by design).** Remaining work is execution, not analysis: (1) rebuild §5 on a live `poolGetPools` pull; (2) produce the actual §3.4 liquidation P&L (a Phase‑0 deliverable); (3) close gates G1–G5. These are explicitly tracked, not hidden.
